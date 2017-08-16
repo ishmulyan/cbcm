@@ -40,6 +40,10 @@ func (r *Runner) Execute(bucket, password string, changes []ChangeSet) error {
 }
 
 func execute(b *gocb.Bucket, m *gocb.BucketManager, changes []ChangeSet) error {
+	if err := validate(changes); err != nil {
+		return err
+	}
+
 	changelog := ChangeLogDocument{}
 	b.Get(changelogDocKey, &changelog)
 	defer b.Upsert(changelogDocKey, &changelog, 0)
@@ -62,6 +66,27 @@ func execute(b *gocb.Bucket, m *gocb.BucketManager, changes []ChangeSet) error {
 			changelog[changeset.ID] = changeSetInfo
 			log.Printf("Changeset \"%s\" execution has finished", changeset)
 		}
+	}
+	return nil
+}
+
+func validate(changes []ChangeSet) error {
+	m := make(map[string]bool)
+	for _, changeset := range changes {
+		if changeset.ID == "" {
+			log.Printf("ID is not allowed: \"%s\"", changeset)
+			return ErrNotAllowedChangesetID
+		}
+		if changeset.Execute == nil {
+			log.Printf("Execute is nil: \"%s\"", changeset)
+			return ErrNilChangesetExecute
+		}
+
+		if _, ok := m[changeset.ID]; ok {
+			log.Printf("Duplicate change has found: \"%s\"", changeset.ID)
+			return ErrNotUniqueChangeSets
+		}
+		m[changeset.ID] = true
 	}
 	return nil
 }
