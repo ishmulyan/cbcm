@@ -27,8 +27,8 @@ func New(connSpecStr string) (*Runner, error) {
 	return &r, nil
 }
 
-// Execute executes changeset on a bucket.
-func (r *Runner) Execute(bucket, password string, changeset ChangeSet) error {
+// Execute executes changesets on a bucket.
+func (r *Runner) Execute(bucket, password string, changes []ChangeSet) error {
 	b, err := r.cluster.OpenBucket(bucket, password)
 	if err != nil {
 		return err
@@ -36,34 +36,32 @@ func (r *Runner) Execute(bucket, password string, changeset ChangeSet) error {
 	defer b.Close()
 
 	m := b.Manager(bucket, password)
-	return execute(b, m, changeset)
+	return execute(b, m, changes)
 }
 
-func execute(b *gocb.Bucket, m *gocb.BucketManager, changeset ChangeSet) error {
-	changelogDoc := ChangeLogDocument{}
-	b.Get(changelogDocKey, &changelogDoc)
-	changeSetDoc, ok := changelogDoc[changeset.ID]
-	if !ok {
-		changeSetDoc = ChangeSetDocument{}
-		changelogDoc[changeset.ID] = changeSetDoc
-	}
+func execute(b *gocb.Bucket, m *gocb.BucketManager, changes []ChangeSet) error {
+	changelog := ChangeLogDocument{}
+	b.Get(changelogDocKey, &changelog)
+	defer b.Upsert(changelogDocKey, &changelog, 0)
 
-	log.Printf("Executing changeset \"%s\"...", changeset.ID)
-	for _, change := range changeset.Changes {
-		if _, ok = changeSetDoc[change.UID()]; ok {
-			log.Printf("Skipping change \"%s\" from \"%s\"...", change.ID, changeset.ID)
+	for _, changeset := range changes {
+		if _, ok := changelog[changeset.ID]; ok {
+			log.Printf("Skipping changeset: \"%s\"", changeset)
 		} else {
-			log.Printf("Executing change \"%s\" from \"%s\"...", change.ID, changeset.ID)
-			err := change.Execute(b, m)
+			log.Printf("Executing changeset \"%s\"", changeset)
+			err := changeset.Execute(b, m)
 			if err != nil {
-				log.Printf("Executing change \"%s\" from \"%s\" has failed. %s", change.ID, changeset.ID, err)
+				log.Printf("Changeset \"%s\" execution has failed. %s", changeset, err)
 				return err
 			}
-			changeSetDoc[change.UID()] = time.Now().UnixNano()
-			log.Printf("Change \"%s\" execution from \"%s\" has finished", change.ID, changeset.ID)
+			changeSetInfo := ChangeSetInfo{
+				ID:        changeset.ID,
+				Author:    changeset.Author,
+				AppliedAt: uint64(time.Now().UnixNano() / int64(time.Millisecond)),
+			}
+			changelog[changeset.ID] = changeSetInfo
+			log.Printf("Changeset \"%s\" execution has finished", changeset)
 		}
 	}
-	b.Upsert(changelogDocKey, &changelogDoc, 0)
-	log.Printf("Changeset \"%s\" execution has finished", changeset.ID)
 	return nil
 }
