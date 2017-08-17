@@ -44,7 +44,7 @@ func execute(b *gocb.Bucket, m *gocb.BucketManager, changes []ChangeSet) error {
 		return err
 	}
 
-	changelog := ChangeLogDocument{}
+	changelog := changeLogDocument{}
 	b.Get(changelogDocKey, &changelog)
 	defer b.Upsert(changelogDocKey, &changelog, 0)
 
@@ -58,12 +58,12 @@ func execute(b *gocb.Bucket, m *gocb.BucketManager, changes []ChangeSet) error {
 				log.Printf("Changeset \"%s\" execution has failed. %s", changeset, err)
 				return err
 			}
-			changeSetInfo := ChangeSetInfo{
+			info := changeSetInfo{
 				ID:        changeset.ID,
 				Author:    changeset.Author,
 				AppliedAt: uint64(time.Now().UnixNano() / int64(time.Millisecond)),
 			}
-			changelog[changeset.ID] = changeSetInfo
+			changelog[changeset.ID] = info
 			log.Printf("Changeset \"%s\" execution has finished", changeset)
 		}
 	}
