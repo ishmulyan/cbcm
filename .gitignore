@@ -13,7 +13,3 @@ debug
 
 # Project-local glide cache, RE: https://github.com/Masterminds/glide/issues/736
 .glide/
-
-cbcm.json
-main.go
-main_test.go
