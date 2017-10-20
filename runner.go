@@ -45,7 +45,9 @@ func execute(b *gocb.Bucket, m *gocb.BucketManager, changes []ChangeSet) error {
 	}
 
 	changelog := changeLogDocument{}
-	b.Get(changelogDocKey, &changelog)
+	if _, err := b.Get(changelogDocKey, &changelog); err != nil {
+		return err
+	}
 	defer b.Upsert(changelogDocKey, &changelog, 0)
 
 	for _, changeset := range changes {
