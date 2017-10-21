@@ -45,7 +45,7 @@ func execute(b *gocb.Bucket, m *gocb.BucketManager, changes []ChangeSet) error {
 	}
 
 	changelog := changeLogDocument{}
-	if _, err := b.Get(changelogDocKey, &changelog); err != gocb.ErrKeyNotFound {
+	if _, err := b.Get(changelogDocKey, &changelog); err != nil && err != gocb.ErrKeyNotFound {
 		return err
 	}
 	defer b.Upsert(changelogDocKey, &changelog, 0)
